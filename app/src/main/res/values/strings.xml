@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VisionTrack</string>
+    <string name="app_tagline">Real-Time AI Object Detection</string>
+    <string name="detection_channel_name">Detection Service</string>
+    <string name="detection_channel_desc">VisionTrack background detection notifications</string>
+    <string name="permission_camera_rationale">VisionTrack needs camera access to run real-time AI object detection.</string>
+    <string name="permission_notification_rationale">Enable notifications to receive zone-based detection alerts.</string>
+</resources>

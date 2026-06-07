@@ -1,0 +1,13 @@
+﻿.gradle/
+build/
+**/build/
+*.apk
+*.aab
+*.hprof
+local.properties
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+google-services.json
+app/src/main/assets/yolov8n.tflite

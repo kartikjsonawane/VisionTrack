@@ -1,0 +1,13 @@
+# VisionTrack ML Pipeline Requirements
+ultralytics>=8.0.196
+tensorflow>=2.16.1
+tensorflow-lite>=2.16.1
+numpy>=1.24.0
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+Pillow>=10.0.0
+PyYAML>=6.0
+tqdm>=4.66.0
+seaborn>=0.12.0        # for confusion matrix heatmaps
+pandas>=2.0.0          # for results DataFrames
+scipy>=1.11.0          # for PR curve AUC
