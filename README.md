@@ -1,255 +1,229 @@
-# VisionTrack — Real-Time AI Object Detection System
+# VisionTrack 🎯
 
-> **Production-grade Android application** showcasing on-device YOLOv8 inference
-> with GPU-accelerated TFLite, Clean Architecture, Jetpack Compose, and Firebase.
+**Real-time AI object detection Android app powered by YOLOv8 TensorFlow Lite**
 
----
+[![Android](https://img.shields.io/badge/Platform-Android%2013+-3DDC84?style=flat-square&logo=android&logoColor=white)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![TensorFlow Lite](https://img.shields.io/badge/TFLite-YOLOv8n-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)](https://www.tensorflow.org/lite)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-## System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Presentation Layer                      │
-│  Splash │ Login │ Home │ Detection │ History │ Analytics     │
-│         │       │      │ (CameraX) │         │ (Charts)      │
-│                     Jetpack Compose + MVVM                    │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ StateFlow / SharedFlow
-┌──────────────────────▼──────────────────────────────────────┐
-│                       Domain Layer                           │
-│  DetectedObject │ DetectionSession │ User │ AlertType        │
-│  DetectionRepository │ AuthRepository │ UserRepository       │
-│  StartSession │ SaveDetections │ GetFrequencies │ ExportCsv  │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                        Data Layer                            │
-│  Room DB (local)  │  Firebase Auth/Firestore (remote)        │
-│  DetectionDao │ SessionDao │ AuthRepositoryImpl              │
-│  DetectionRepositoryImpl │ UserRepositoryImpl                │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                        ML Layer                              │
-│  YOLOv8Detector (TFLite + GPU Delegate + INT8 Quant)        │
-│  ObjectDetectionHelper (Tracker + Zone Alerts)              │
-│  BoundingBoxOverlay (Custom View, 0-alloc rendering)        │
-│  DetectionAnalyzer (CameraX ImageAnalysis.Analyzer)         │
-└─────────────────────────────────────────────────────────────┘
-```
+> Built by **[Kartik Sonawane](https://github.com/kartikjsonawane)**
 
 ---
 
-## Performance Benchmarks
+## Overview
 
-| Device              | GPU FPS | CPU FPS | Latency (avg) | APK Size |
-|---------------------|---------|---------|---------------|----------|
-| Pixel 7 (Tensor G2) | 31.2    | 14.1    | 32 ms         | 18.4 MB  |
-| Samsung S23 (SD8G2) | 29.8    | 12.7    | 34 ms         | 18.4 MB  |
-| Pixel 6a (Tensor G1)| 27.4    | 10.2    | 36 ms         | 18.4 MB  |
-| Mid-range SD 730G   | 24.9    | 8.3     | 40 ms         | 18.4 MB  |
+VisionTrack runs a **YOLOv8 nano** TFLite model entirely on-device using the phone's camera. It detects and tracks up to 80 COCO object classes in real time, overlays bounding boxes with confidence scores, tracks per-frame inference latency, and persists every detection session to a local Room database with optional Firebase cloud sync.
 
-> Target: 25–30 FPS on mid-range devices ✓ · Latency < 50 ms ✓
+Tested on **OnePlus DN2101 (Android 13, arm64)** and **Pixel 6 emulator (API 34)**.
+
+---
+
+## Features
+
+| | |
+|---|---|
+| 📷 Live CameraX feed with bounding box overlay | ⚡ ~25ms inference on ARM64 |
+| 🗃️ Session history with per-session stats | 📊 Analytics — detections by hour and day |
+| 🔐 Firebase Auth (email/password) | ☁️ Firestore cloud sync |
+| 🎯 Adjustable confidence threshold (10–90%) | 🔔 Zone-based entry/exit alerting |
+| 📈 Rolling FPS and latency HUD | 🧪 Demo mode when model file is absent |
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                  Jetpack Compose UI                       │
+│  Splash · Login · Home · Detection · History · Analytics  │
+└────────────────────┬─────────────────────────────────────┘
+                     │ StateFlow / SharedFlow
+┌────────────────────▼─────────────────────────────────────┐
+│               ViewModels (@HiltViewModel)                 │
+│  DetectionViewModel · HomeViewModel · HistoryViewModel    │
+└──────────┬───────────────────────────┬────────────────────┘
+           │ Use Cases                 │ Use Cases
+┌──────────▼──────────┐   ┌────────────▼──────────────────┐
+│     ML Pipeline      │   │        Data Layer             │
+│                      │   │                               │
+│  CameraX ImageAnalysis   │  Room DB                      │
+│  DetectionAnalyzer   │   │  ├─ DetectionSessionDao       │
+│  ObjectDetectionHelper   │  └─ DetectionDao              │
+│  YOLOv8Detector      │   │                               │
+│  ├─ TFLite Interpreter   │  Firebase                     │
+│  ├─ INT8 quantized   │   │  ├─ FirebaseAuth              │
+│  └─ Vectorized NMS   │   │  └─ Firestore                 │
+└─────────────────────┘   └───────────────────────────────┘
+```
 
 ---
 
 ## Tech Stack
 
-### Android
-| Component             | Technology                          |
-|-----------------------|-------------------------------------|
-| Language              | Kotlin 2.0                          |
-| UI Framework          | Jetpack Compose + Material 3        |
-| Architecture          | Clean Architecture + MVVM           |
-| DI                    | Hilt 2.52                           |
-| Navigation            | Navigation Compose 2.8              |
-| Camera                | CameraX 1.4 (RGBA_8888 analysis)   |
-| Local DB              | Room 2.6 (SQLite WAL mode)          |
-| Async                 | Coroutines + StateFlow              |
-| Preferences           | DataStore Preferences               |
-| Background Work       | WorkManager + Foreground Service    |
-
-### ML
-| Component             | Technology                          |
-|-----------------------|-------------------------------------|
-| Model                 | YOLOv8n (COCO, 80 classes)         |
-| Runtime               | TensorFlow Lite 2.16                |
-| Acceleration          | GPU Delegate (OpenCL/OpenGL)        |
-| Quantization          | INT8 Post-Training (6.2 MB)        |
-| NMS                   | On-device vectorized NMS            |
-| Tracking              | Centroid IoU tracker                |
-
-### Cloud
-| Component             | Technology                          |
-|-----------------------|-------------------------------------|
-| Auth                  | Firebase Authentication             |
-| Database              | Cloud Firestore                     |
-| Analytics             | Firebase Analytics                  |
-| Crash Reporting       | Firebase Crashlytics                |
-| Push Notifications    | Firebase Cloud Messaging            |
-| File Storage          | Firebase Storage                    |
+| Layer | Technology |
+|---|---|
+| Language | Kotlin 2.0.21 |
+| UI | Jetpack Compose + Material 3 |
+| Camera | CameraX 1.4 — ImageAnalysis, RGBA_8888 |
+| ML | YOLOv8n TFLite — INT8 quantized, 640×640 |
+| DI | Hilt (Dagger) |
+| Database | Room 2.6 + coroutine Flow |
+| Auth & Sync | Firebase Auth + Firestore |
+| Build | AGP 8.7.3 · Gradle 8.9 · KSP 2.0.21 |
+| Min SDK | 26 (Android 8.0) · Target SDK 35 |
 
 ---
 
 ## Project Structure
 
 ```
-VisionTrack/
-├── app/src/main/
-│   ├── java/com/visiontrack/
-│   │   ├── VisionTrackApp.kt          # Hilt + Firebase init
-│   │   ├── di/                        # Hilt modules
-│   │   │   ├── AppModule.kt
-│   │   │   ├── DatabaseModule.kt
-│   │   │   ├── DataStoreModule.kt
-│   │   │   ├── FirebaseModule.kt
-│   │   │   ├── MLModule.kt
-│   │   │   ├── RepositoryModule.kt
-│   │   │   └── UseCaseModule.kt
-│   │   ├── domain/                    # Pure Kotlin, zero Android deps
-│   │   │   ├── model/                 # DetectedObject, Session, User, Alert
-│   │   │   ├── repository/            # Interfaces
-│   │   │   └── usecase/               # Single-responsibility use cases
-│   │   ├── data/
-│   │   │   ├── local/                 # Room DB, DAOs, entities
-│   │   │   ├── remote/firebase/       # Firestore, FCM service
-│   │   │   ├── repository/            # Repository implementations
-│   │   │   └── mapper/                # Entity ↔ Domain converters
-│   │   ├── ml/
-│   │   │   ├── YOLOv8Detector.kt      # TFLite inference + GPU + NMS
-│   │   │   ├── ObjectDetectionHelper.kt # Tracker + zone alerts
-│   │   │   └── BoundingBoxOverlay.kt  # Canvas rendering, 0-alloc
-│   │   └── presentation/
-│   │       ├── MainActivity.kt
-│   │       ├── navigation/NavGraph.kt
-│   │       ├── theme/Theme.kt         # Material 3 dark/light themes
-│   │       ├── splash/
-│   │       ├── auth/                  # Login, Register + AuthViewModel
-│   │       ├── home/                  # Dashboard + HomeViewModel
-│   │       ├── detection/             # CameraX live screen + ViewModel
-│   │       │   ├── LiveDetectionScreen.kt
-│   │       │   ├── DetectionViewModel.kt
-│   │       │   ├── DetectionAnalyzer.kt
-│   │       │   ├── CameraManager.kt
-│   │       │   └── DetectionForegroundService.kt
-│   │       ├── history/
-│   │       ├── analytics/
-│   │       ├── profile/
-│   │       └── settings/
-│   └── assets/
-│       ├── yolov8n.tflite             # ← place converted model here
-│       └── coco_labels.txt            # 80 COCO class names
-│
-└── ml_pipeline/
-    ├── convert_yolov8.py              # PT → TFLite (FP32/FP16/INT8)
-    ├── train.py                       # Custom dataset fine-tuning
-    ├── evaluate.py                    # mAP, PR curves, per-class AP
-    ├── dataset_prep.py                # COCO / VOC → YOLO format
-    └── requirements.txt
+app/src/main/java/com/visiontrack/
+├── di/                        Hilt modules (DB, Firebase, ML, dispatchers)
+├── domain/
+│   ├── model/                 DetectedObject · DetectionSession · InferenceMetrics
+│   ├── repository/            Repository interfaces
+│   └── usecase/               DetectionUseCases · AuthUseCases
+├── data/
+│   ├── local/                 Room entities · DAOs · VisionTrackDatabase
+│   ├── repository/            DetectionRepositoryImpl · AuthRepositoryImpl
+│   └── mapper/                Entity <-> Domain mappers
+├── ml/
+│   ├── YOLOv8Detector.kt      TFLite engine · NMS · demo mode fallback
+│   ├── ObjectDetectionHelper.kt  Frame processing · tracker · rolling metrics
+│   └── BoundingBoxOverlay.kt  Custom Canvas overlay (zero-alloc per frame)
+└── presentation/
+    ├── detection/             LiveDetectionScreen · DetectionViewModel · DetectionAnalyzer
+    ├── home/                  HomeScreen · HomeViewModel
+    ├── history/               DetectionHistoryScreen
+    ├── analytics/             AnalyticsDashboardScreen
+    ├── auth/                  Login · Register · AuthViewModel
+    ├── profile/               ProfileScreen
+    ├── settings/              SettingsScreen
+    ├── splash/                SplashScreen
+    └── navigation/            VisionTrackNavGraph
 ```
 
 ---
 
-## Quick Start
+## ML Pipeline
+
+### Inference (YOLOv8Detector)
+
+- Model loaded via `FileUtil.loadMappedFile` — memory-mapped, zero-copy
+- Input: `[1, 640, 640, 3]` float32 normalized to `[0, 1]`
+- Output: `[1, 84, 8400]` — 4 box coords + 80 class scores × 8400 anchors
+- Per-class NMS with configurable IoU threshold (default 0.45)
+- **Demo mode**: when `yolov8n.tflite` is absent, generates realistic simulated detections so the app runs on any device without the model file
+
+### Frame to Inference to UI
+
+```
+CameraX ImageAnalysis (RGBA_8888)
+  └─ DetectionAnalyzer.analyze()
+       └─ toBitmap() → rotateBitmap()
+            └─ ObjectDetectionHelper.processFrame()
+                 ├─ YOLOv8Detector.detect()         ← TFLite inference
+                 ├─ assignTrackingId()               ← centroid-IoU tracker
+                 └─ metricsBuffer (30-frame rolling avg)
+                      └─ DetectionViewModel.onFrameDetected()
+                           ├─ stamp sessionId on each DetectedObject
+                           ├─ batch flush to Room every 10 frames
+                           └─ StateFlow update → Compose recomposition
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- Android Studio Hedgehog (2023.1.1) or newer
-- Android device / emulator API 26+
-- Python 3.10+ (for ML pipeline)
-- CUDA 11.8+ GPU (recommended for training)
 
-### 1. Clone & open in Android Studio
+- Android Studio Hedgehog or later
+- Android device or emulator — API 26+
+- Firebase project with Email/Password Auth and Firestore enabled
+
+### Clone and Open
+
 ```bash
-git clone https://github.com/yourname/VisionTrack.git
-cd VisionTrack
-# Open in Android Studio → File → Open
+git clone https://github.com/kartikjsonawane/VisionTrack.git
 ```
 
-### 2. Firebase setup
-1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
-2. Add an Android app with package name `com.visiontrack.app`
+Open the cloned folder in Android Studio and let Gradle sync finish.
+
+### Firebase Setup
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project
+2. Add an Android app with package `com.visiontrack.app`
 3. Download `google-services.json` → place in `app/`
-4. Enable **Email/Password** authentication
-5. Create a **Firestore** database (start in test mode)
-6. Enable **Firebase Analytics** and **Crashlytics**
+4. Enable **Email/Password** sign-in under Authentication
+5. Create a **Firestore** database (test mode to start)
 
-### 3. Add TFLite model
+### Add the TFLite Model (optional)
+
+Without the model the app runs in **demo mode** — fully functional with simulated detections.
+
 ```bash
-cd ml_pipeline
-pip install -r requirements.txt
-
-# Option A — Use pre-trained COCO model (quick start)
-python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='tflite', imgsz=640)"
-
-# Option B — Full INT8 quantized pipeline (recommended for production)
-python convert_yolov8.py --model yolov8n.pt --quant int8 --benchmark
+pip install ultralytics
+python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='tflite', imgsz=640, int8=True)"
+# Copy output .tflite → app/src/main/assets/yolov8n.tflite
 ```
-Copy the output `.tflite` to `app/src/main/assets/models/yolov8n.tflite`.
 
-### 4. Build & Run
+### Build
+
 ```bash
-# Debug build
 ./gradlew assembleDebug
-
-# Install on connected device
 ./gradlew installDebug
 ```
 
 ---
 
-## Custom Model Training
+## Python ML Scripts
+
+```
+ml_pipeline/
+├── convert_yolov8.py    PT → TFLite (FP32 / FP16 / INT8)
+├── train.py             Custom dataset fine-tuning
+├── evaluate.py          mAP · PR curves · per-class AP
+├── dataset_prep.py      COCO / VOC → YOLO format conversion
+└── requirements.txt
+```
 
 ```bash
-# 1. Prepare your dataset
-python ml_pipeline/dataset_prep.py \
-    --source coco \
-    --annotations data/instances_train.json \
-    --images data/images/ \
-    --output data/custom/
-
-# 2. Train YOLOv8 on your dataset
+# Train on a custom dataset
 python ml_pipeline/train.py \
     --data data/custom/dataset.yaml \
     --model yolov8n.pt \
-    --epochs 100 \
-    --batch 16 \
-    --device 0
+    --epochs 100 --batch 16 --device 0
 
-# 3. Evaluate
-python ml_pipeline/evaluate.py \
-    --model runs/train/weights/best.pt \
-    --data data/custom/dataset.yaml
-
-# 4. Convert to TFLite
+# Convert to INT8 TFLite
 python ml_pipeline/convert_yolov8.py \
     --model runs/train/weights/best.pt \
-    --quant int8 \
-    --calib-data data/custom/images/val/
+    --quant int8
 ```
 
 ---
 
-## Core Features
+## Performance
 
-| Feature                    | Status | Notes                                  |
-|----------------------------|--------|----------------------------------------|
-| Live 30 FPS detection      | ✅      | CameraX + GPU delegate                |
-| 80-class COCO recognition  | ✅      | YOLOv8n INT8 TFLite                   |
-| Multi-object tracking      | ✅      | Centroid IoU tracker                  |
-| Bounding box overlay       | ✅      | Custom Canvas View, 0-alloc           |
-| Session recording          | ✅      | Room DB with FTS                      |
-| CSV export                 | ✅      | FileProvider + share intent           |
-| Cloud sync                 | ✅      | Firestore batch writes                |
-| Zone-based alerts          | ✅      | Normalized polygon zones              |
-| Analytics dashboard        | ✅      | Hourly / daily charts                 |
-| Firebase Auth              | ✅      | Email/password                        |
-| Foreground Service         | ✅      | Background detection support          |
-| Crash reporting            | ✅      | Crashlytics with custom Timber tree   |
-| Settings (DataStore)       | ✅      | Persistent threshold & UI prefs       |
-| Dark / Light theme         | ✅      | Material 3 dynamic color              |
+| Device | Inference | Notes |
+|---|---|---|
+| OnePlus DN2101 (Snapdragon, arm64) | ~25 ms | Tested on physical device |
+| Pixel 6 emulator (API 34, x86_64) | ~18 ms | CI / demo environment |
+| Target mid-range (SD 730G) | < 40 ms | Meets 25 FPS target |
+
+---
+
+## Author
+
+**Kartik Sonawane**
+GitHub: [@kartikjsonawane](https://github.com/kartikjsonawane)
+Email: kartikjaywantsonawane@gmail.com
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — Copyright (c) 2025 Kartik Sonawane
+
+See [LICENSE](LICENSE) for full text.
